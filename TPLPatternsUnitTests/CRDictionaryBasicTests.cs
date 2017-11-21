@@ -5,7 +5,6 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using TPLPatternExamples;
 using Xunit;
 using Xunit.Abstractions;
@@ -63,39 +62,6 @@ namespace TPLPatternsUnitTests {
             this.output = output;
         }
 
-        // Use an observer class to watch the events on the ObservableConcurrentDictionary
-        [Theory]
-        [InlineData("k1=1,k2=1,1.1;")]
-        public void OCREventsViaObserver(string str) {
-            WithObservableConcurrentDictionary withObservableConcurrentDictionary = new WithObservableConcurrentDictionary();
-            void RecordResults(string instr)
-            {
-                var match = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);").Match(instr);
-                while(match.Success) {
-                    withObservableConcurrentDictionary.RecordCalculatedResults(match.Groups["k1"].Value,
-                                                                               match.Groups["k2"].Value,
-                                                                               decimal.Parse(match.Groups["pr"].Value));
-                    match = match.NextMatch();
-                }
-            }
-
-            List<string> receivedEvents = new List<string>();
-
-            // attach a handler to the PropertyChanged event of the outer dictionary
-            withObservableConcurrentDictionary.calculatedResults.PropertyChanged += delegate(object sender, PropertyChangedEventArgs e) { receivedEvents.Add(e.PropertyName); };
-            // attach a handler to the CollectionChanged event of the outer dictionary
-            withObservableConcurrentDictionary.calculatedResults.CollectionChanged += delegate(object sender, NotifyCollectionChangedEventArgs e) { receivedEvents.Add($"{e.Action} NumItemsToAdd {e.NewItems.Count}"); };
-            // populate the OCR
-            RecordResults(str);
-            Task.Delay(1000);
-            //output.WriteLine($"{receivedEvents.Count}");
-            receivedEvents.ForEach(x => output.WriteLine($"{x}"));
-            //Assert.Equal(2, receivedEvents.Count);
-            //Assert.Equal("CollectionView", receivedEvents[0]);
-            //Assert.Equal("Count", receivedEvents[1]);
-            Assert.Equal(2, 2);
-        }
-
         // Some of the InlineData is not sorted, but the query over the dictionaries will sort, so the asserts are for the results in sorted order
         [Theory]
         [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
@@ -129,49 +95,110 @@ namespace TPLPatternsUnitTests {
                          withObservableConcurrentDictionary.calculatedResults.Count());
         }
 
-        
-
-        // Test via an observer that the Collection changed event gets raised
+        // Test via the Observer pattern that the NotifyCollectionChanged event gets raised correctly
         [Theory]
         [InlineData("k1=1,k2=1,1.1;")]
+        [InlineData("k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
         [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
-        public void OCRPropertyChangedEventsViaObserver(string str)
-        {
-            // Going to use a ConcurrentDictionary to hold the information written by teh event handlers
+        public void OCRPropertyChangedEventsViaObserver(string str) {
+            // Going to use a ConcurrentDictionary to hold the information written by the event handlers
             ConcurrentDictionary<string, string> receivedEvents = new ConcurrentDictionary<string, string>();
 
-            // This event handler will be attached/detached from the ObservableConcurrentDictionary via that class' constructor and dispose method
-            void onNotifyCollectionChanged(object sender,
-    NotifyCollectionChangedEventArgs e)
+            // These event handler will be attached/detached from the ObservableConcurrentDictionary via that class' constructor and dispose method
+            void onNotifyCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
             {
-                receivedEvents[$"Ticks: {DateTime.Now.Ticks} Event: NotifyCollectionChanged Action:{e.Action} NumItemsToAdd {e.NewItems.Count}"]=  DateTime.Now.ToLongTimeString();
+                string s = $"Ticks: {DateTime.Now.Ticks} Event: NotifyCollectionChanged  Action: {e.Action}  ";
+                switch(e.Action) {
+                    case NotifyCollectionChangedAction.Add:
+                        s += $"NumItemsToAdd { e.NewItems.Count}";
+                        break;
+                    case NotifyCollectionChangedAction.Move:
+                        break;
+                    case NotifyCollectionChangedAction.Remove:
+                        s += $"NumItemsToDel {e.OldItems.Count}";
+                        break;
+                    case NotifyCollectionChangedAction.Replace:
+                        break;
+                    case NotifyCollectionChangedAction.Reset:
+                        break;
+                    default:
+                        break;
+                }
+                receivedEvents[s] = DateTime.Now.ToLongTimeString();
             };
             void onPropertyChanged(object sender, PropertyChangedEventArgs e)
             {
-                receivedEvents[$"Ticks: {DateTime.Now.Ticks} Event: PropertyChanged PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
+                receivedEvents[$"Ticks: {DateTime.Now.Ticks} Event: PropertyChanged  PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
 
-                            };
-            WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(onNotifyCollectionChanged, onPropertyChanged);
-            void RecordResults(string instr)
+            };
+            //These event handlers will be attached to each innerDictionary
+            void onNotifyNestedCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+            {
+                string s = $"Ticks: {DateTime.Now.Ticks} Event: NotifyNestedCollectionChanged  Action: {e.Action}  ";
+                switch(e.Action) {
+                    case NotifyCollectionChangedAction.Add:
+                        s += $"NumItemsToAdd { e.NewItems.Count}";
+                        break;
+                    case NotifyCollectionChangedAction.Move:
+                        break;
+                    case NotifyCollectionChangedAction.Remove:
+                        s += $"NumItemsToDel {e.OldItems.Count}";
+                        break;
+                    case NotifyCollectionChangedAction.Replace:
+                        break;
+                    case NotifyCollectionChangedAction.Reset:
+                        break;
+                    default:
+                        break;
+                }
+                receivedEvents[s] = DateTime.Now.ToLongTimeString();
+            };
+            void onNestedPropertyChanged(object sender, PropertyChangedEventArgs e)
+            {
+                receivedEvents[$"Ticks: {DateTime.Now.Ticks} Event: NestedPropertyChanged  PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
+
+            };
+            WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(onNotifyCollectionChanged,
+                                                                                                                                                                           onPropertyChanged,
+                                                                                                                                                                           onNotifyNestedCollectionChanged,
+                                                                                                                                                                           onNestedPropertyChanged);
+            int RecordResults(string instr)
             {
                 var match = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);").Match(instr);
-                while (match.Success)
-                {
+                int _numResultsRecorded = default;
+                while(match.Success) {
                     withObservableConcurrentDictionaryAndEventHandlers.RecordCalculatedResults(match.Groups["k1"].Value,
-                                                                               match.Groups["k2"].Value,
-                                                                               decimal.Parse(match.Groups["pr"].Value));
+                                                                                               match.Groups["k2"].Value,
+                                                                                               decimal.Parse(match.Groups["pr"].Value));
+                    _numResultsRecorded++;
                     match = match.NextMatch();
                 }
+                return _numResultsRecorded;
             }
 
             // populate the OCR
-            RecordResults(str);
-            Task.Delay(1000);
-            receivedEvents.Keys.OrderBy(x => x).ToList().ForEach(x => output.WriteLine($"{x} : {receivedEvents[x]}"));
-            //Assert.Equal(2, receivedEvents.Count);
-            //Assert.Equal("CollectionView", receivedEvents[0]);
-            //Assert.Equal("Count", receivedEvents[1]);
-            Assert.Equal(2, 2);
+            var numResultsRecorded = RecordResults(str);
+            // send the observed events to test output
+            receivedEvents.Keys.OrderBy(x => x)
+                .ToList()
+                .ForEach(x => output.WriteLine($"{x} : {receivedEvents[x]}"));
+            // There should be as many inner NotifyCollectionChanged events are there are results recorded.
+            var numInnerNotifyCollectionChanged = receivedEvents.Keys.Where(x => x.Contains("Event: NotifyNestedCollectionChanged"))
+                                                      .ToList()
+                                                      .Count;
+            Assert.Equal(numResultsRecorded, numInnerNotifyCollectionChanged);
+            // There should be as many outer NotifyCollectionChanged events are there are unique values of K1 in the input str.
+            var matchUniqueK1Values = new Regex("(?<k1>.*?),.*?;").Match(str);
+            var dictUniqueK1Values = new Dictionary<string, int>();
+            while(matchUniqueK1Values.Success) {
+                dictUniqueK1Values[matchUniqueK1Values.Groups["k1"].Value] = 0;
+                matchUniqueK1Values = matchUniqueK1Values.NextMatch();
+            }
+            var numUniqueK1Values = dictUniqueK1Values.Keys.Count;
+            var numOuterNotifyCollectionChanged = receivedEvents.Keys.Where(x => x.Contains("Event: NotifyCollectionChanged"))
+                                                      .ToList()
+                                                      .Count;
+            Assert.Equal(numUniqueK1Values, numOuterNotifyCollectionChanged);
         }
     }
 }

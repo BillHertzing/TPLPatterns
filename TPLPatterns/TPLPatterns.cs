@@ -1,120 +1,133 @@
-﻿using Swordfish.NET.Collections;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using Swordfish.NET.Collections;
 
-namespace TPLPatternExamples
-{
-    public class TPLPatterns
-    {
+namespace TPLPatternExamples {
+    public class TPLPatterns {
         public ConcurrentDictionary<string, ConcurrentDictionary<string, decimal>> calculatedResults;
-        public void RecordCalculatedResults(string k1, string k2, decimal pr)
-        {
-            if (calculatedResults.ContainsKey(k1)) {
-                var innerDictionary = calculatedResults[k1];
-                if (innerDictionary.ContainsKey(k2))
-                {
-                    throw new NotSupportedException("This pattern expects only one entry per k1k2 pair");
-                } else
-                {
-                    if (!innerDictionary.TryAdd(k2, pr)) throw new Exception($"adding {pr} to {k1}'s innerDictionary keyed by {k2} failed");
-                }
-            } else {
-                var innerDictionary = new ConcurrentDictionary<string, decimal>();
-                if (!innerDictionary.TryAdd(k2, pr)) throw new Exception($"adding {pr} to the new innerDictionary keyed by {k2} failed");
-                if (!calculatedResults.TryAdd(k1, innerDictionary)) throw new Exception($"adding the new innerDictionary to calculatedResults keyed by {k1} failed");
-            };
-        }
-        public TPLPatterns()
-        {
+
+        public TPLPatterns() {
             calculatedResults = new ConcurrentDictionary<string, ConcurrentDictionary<string, decimal>>();
         }
-    }
-    public class WithObservableConcurrentDictionary
-    {
-        public ConcurrentObservableDictionary<string, ConcurrentObservableDictionary<string, decimal>>  calculatedResults;
 
-
-        public void RecordCalculatedResults(string k1, string k2, decimal pr)
-        {
-            if (calculatedResults.ContainsKey(k1))
-            {
+        public void RecordCalculatedResults(string k1, string k2, decimal pr) {
+            if(calculatedResults.ContainsKey(k1)) {
                 var innerDictionary = calculatedResults[k1];
-                if (innerDictionary.ContainsKey(k2))
-                {
+                if(innerDictionary.ContainsKey(k2)) {
                     throw new NotSupportedException("This pattern expects only one entry per k1k2 pair");
                 }
-                else
-                {
-                    //ToDo: Better understanding/handling of exceptions here
-                    try { innerDictionary.Add(k2, pr); } catch { new Exception($"adding {pr} to {k1}'s innerDictionary keyed by {k2} failed"); }
+                else {
+                    if(!innerDictionary.TryAdd(k2, pr)) {
+                        throw new Exception($"adding {pr} to {k1}'s innerDictionary keyed by {k2} failed");
+                    }
                 }
             }
-            else
-            {
-                var innerDictionary = new ConcurrentObservableDictionary<string, decimal>();
-                try { innerDictionary.Add(k2, pr); } catch { new Exception($"adding {pr} to the new innerDictionary keyed by {k2} failed"); }
-                try { calculatedResults.Add(k1, innerDictionary); } catch { new Exception($"adding the new innerDictionary to calculatedResults keyed by {k1} failed"); }
+            else {
+                var innerDictionary = new ConcurrentDictionary<string, decimal>();
+                if(!innerDictionary.TryAdd(k2, pr)) {
+                    throw new Exception($"adding {pr} to the new innerDictionary keyed by {k2} failed");
+                }
+
+                if(!calculatedResults.TryAdd(k1, innerDictionary)) {
+                    throw new Exception($"adding the new innerDictionary to calculatedResults keyed by {k1} failed");
+                }
             };
-        }
-        public WithObservableConcurrentDictionary()
-        {
-            calculatedResults = new ConcurrentObservableDictionary<string, ConcurrentObservableDictionary<string, decimal>>();
         }
     }
 
-    public class WithObservableConcurrentDictionaryAndEventHandlers : IDisposable
-    {
+    public class WithObservableConcurrentDictionary {
         public ConcurrentObservableDictionary<string, ConcurrentObservableDictionary<string, decimal>> calculatedResults;
 
-        NotifyCollectionChangedEventHandler onCollectionChanged;
-        PropertyChangedEventHandler onPropertyChanged;
-        public void RecordCalculatedResults(string k1, string k2, decimal pr)
-        {
-            if (calculatedResults.ContainsKey(k1))
-            {
+        public WithObservableConcurrentDictionary() {
+            calculatedResults = new ConcurrentObservableDictionary<string, ConcurrentObservableDictionary<string, decimal>>();
+        }
+
+        public void RecordCalculatedResults(string k1, string k2, decimal pr) {
+            if(calculatedResults.ContainsKey(k1)) {
                 var innerDictionary = calculatedResults[k1];
-                if (innerDictionary.ContainsKey(k2))
-                {
+                if(innerDictionary.ContainsKey(k2)) {
                     throw new NotSupportedException("This pattern expects only one entry per k1k2 pair");
                 }
-                else
-                {
+                else {
                     //ToDo: Better understanding/handling of exceptions here
-                    try { innerDictionary.Add(k2, pr); } catch { new Exception($"adding {pr} to {k1}'s innerDictionary keyed by {k2} failed"); }
+                    try
+                    {
+                        innerDictionary.Add(k2, pr);
+
+                    }
+                    catch { new Exception($"adding {pr} to {k1}'s innerDictionary keyed by {k2} failed"); }
                 }
             }
-            else
-            {
+            else {
                 var innerDictionary = new ConcurrentObservableDictionary<string, decimal>();
                 try { innerDictionary.Add(k2, pr); } catch { new Exception($"adding {pr} to the new innerDictionary keyed by {k2} failed"); }
                 try { calculatedResults.Add(k1, innerDictionary); } catch { new Exception($"adding the new innerDictionary to calculatedResults keyed by {k1} failed"); }
             };
         }
-        public WithObservableConcurrentDictionaryAndEventHandlers(NotifyCollectionChangedEventHandler OnCollectionChanged, PropertyChangedEventHandler OnPropertyChanged)
-        {
+    }
+
+    public class WithObservableConcurrentDictionaryAndEventHandlers : IDisposable {
+        NotifyCollectionChangedEventHandler onCollectionChanged;
+        NotifyCollectionChangedEventHandler onNestedCollectionChanged;
+        PropertyChangedEventHandler onNestedPropertyChanged;
+        PropertyChangedEventHandler onPropertyChanged;
+        public ConcurrentObservableDictionary<string, ConcurrentObservableDictionary<string, decimal>> calculatedResults;
+
+        public WithObservableConcurrentDictionaryAndEventHandlers(NotifyCollectionChangedEventHandler OnCollectionChanged, PropertyChangedEventHandler OnPropertyChanged, NotifyCollectionChangedEventHandler OnNestedCollectionChanged, PropertyChangedEventHandler OnNestedPropertyChanged) {
             calculatedResults = new ConcurrentObservableDictionary<string, ConcurrentObservableDictionary<string, decimal>>();
             this.onCollectionChanged = OnCollectionChanged;
             this.onPropertyChanged = OnPropertyChanged;
-            calculatedResults.CollectionChanged += this.onCollectionChanged;
-            calculatedResults.PropertyChanged += this.onPropertyChanged;
+            this.onNestedCollectionChanged = OnNestedCollectionChanged;
+            this.onNestedPropertyChanged = OnNestedPropertyChanged;
+            calculatedResults.CollectionChanged += onCollectionChanged;
+            calculatedResults.PropertyChanged += onPropertyChanged;
         }
 
-        public void TearDown() { 
-            calculatedResults.CollectionChanged -= this.onCollectionChanged;
-            calculatedResults.PropertyChanged -= this.onPropertyChanged;
-}
+        public void RecordCalculatedResults(string k1, string k2, decimal pr) {
+            if(calculatedResults.ContainsKey(k1)) {
+                var innerDictionary = calculatedResults[k1];
+                if(innerDictionary.ContainsKey(k2)) {
+                    throw new NotSupportedException("This pattern expects only one entry per k1k2 pair");
+                }
+                else {
+                    //ToDo: Better understanding/handling of exceptions here
+                    try { innerDictionary.Add(k2, pr); } catch { new Exception($"adding {pr} to {k1}'s innerDictionary keyed by {k2} failed"); }
+                }
+            }
+            else {
+                var innerDictionary = new ConcurrentObservableDictionary<string, decimal>();
+                innerDictionary.CollectionChanged += onNestedCollectionChanged;
+                try { innerDictionary.Add(k2, pr); } catch { new Exception($"adding {pr} to the new innerDictionary keyed by {k2} failed"); }
+                try { calculatedResults.Add(k1, innerDictionary); } catch { new Exception($"adding the new innerDictionary to calculatedResults keyed by {k1} failed"); }
+            };
+        }
 
         #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposedValue)
+        public void TearDown() {
+            calculatedResults.CollectionChanged -= onCollectionChanged;
+            calculatedResults.PropertyChanged -= onPropertyChanged;
+            var enumerator = calculatedResults.Keys.GetEnumerator();
+            try
             {
-                if (disposing)
-                {
+                while(enumerator.MoveNext()) {
+                    var key = enumerator.Current;
+                    calculatedResults[key].CollectionChanged -= onCollectionChanged;
+                    calculatedResults[key].PropertyChanged -= onPropertyChanged;
+                }
+            }
+            finally
+            {
+                enumerator.Dispose();
+            }
+        }
+
+        bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing) {
+            if(!disposedValue) {
+                if(disposing) {
                     // dispose managed state (managed objects).
                     TearDown();
                 }
@@ -131,14 +144,12 @@ namespace TPLPatternExamples
         //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
         //   Dispose(false);
         // }
-
         // This code added to correctly implement the disposable pattern.
-        public void Dispose()
-        {
+        public void Dispose() {
             // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
             Dispose(true);
-            // TODO: uncomment the following line if the finalizer is overridden above.
-            // GC.SuppressFinalize(this);
+        // TODO: uncomment the following line if the finalizer is overridden above.
+        // GC.SuppressFinalize(this);
         }
         #endregion
     }
