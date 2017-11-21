@@ -138,17 +138,17 @@ namespace TPLPatternsUnitTests {
         public void OCRPropertyChangedEventsViaObserver(string str)
         {
             // Going to use a ConcurrentDictionary to hold the information written by teh event handlers
-            ConcurrentDictionary<string,long> receivedEvents = new ConcurrentDictionary<string, long>();
+            ConcurrentDictionary<string, string> receivedEvents = new ConcurrentDictionary<string, string>();
 
             // This event handler will be attached/detached from the ObservableConcurrentDictionary via that class' constructor and dispose method
             void onNotifyCollectionChanged(object sender,
     NotifyCollectionChangedEventArgs e)
             {
-                receivedEvents[$"Time: {DateTime.Now} Event: NotifyCollectionChanged Action:{e.Action} NumItemsToAdd {e.NewItems.Count}"]=  DateTime.Now.Ticks;
+                receivedEvents[$"Ticks: {DateTime.Now.Ticks} Event: NotifyCollectionChanged Action:{e.Action} NumItemsToAdd {e.NewItems.Count}"]=  DateTime.Now.ToLongTimeString();
             };
             void onPropertyChanged(object sender, PropertyChangedEventArgs e)
             {
-                receivedEvents[$"Time: {DateTime.Now} Event: PropertyChanged PropertyName {e.PropertyName}"] = DateTime.Now.Ticks;
+                receivedEvents[$"Ticks: {DateTime.Now.Ticks} Event: PropertyChanged PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
 
                             };
             WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(onNotifyCollectionChanged, onPropertyChanged);
@@ -167,7 +167,7 @@ namespace TPLPatternsUnitTests {
             // populate the OCR
             RecordResults(str);
             Task.Delay(1000);
-            receivedEvents.Keys.OrderBy(x => receivedEvents[x]).ToList().ForEach(x => output.WriteLine($"{x} : {receivedEvents[x]}"));
+            receivedEvents.Keys.OrderBy(x => x).ToList().ForEach(x => output.WriteLine($"{x} : {receivedEvents[x]}"));
             //Assert.Equal(2, receivedEvents.Count);
             //Assert.Equal("CollectionView", receivedEvents[0]);
             //Assert.Equal("Count", receivedEvents[1]);
