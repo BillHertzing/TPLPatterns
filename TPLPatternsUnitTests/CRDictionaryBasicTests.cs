@@ -104,11 +104,12 @@ namespace TPLPatternsUnitTests {
             // Going to use a ConcurrentDictionary to hold the information written by the event handlers
             ConcurrentDictionary<string, string> receivedEvents = new ConcurrentDictionary<string, string>();
 
-            // These event handler will be attached/detached from the ObservableConcurrentDictionary via that class' constructor and dispose method
-            void onNotifyCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+            // The messages to be written to the receivedEvent dictionary
+            string Message(string depth, NotifyCollectionChangedEventArgs e)
             {
-                string s = $"Ticks: {DateTime.Now.Ticks} Event: NotifyCollectionChanged  Action: {e.Action}  ";
-                switch(e.Action) {
+                string s = $"Ticks: {DateTime.Now.Ticks} Event: Notify{depth}CollectionChanged  Action: {e.Action}  ";
+                switch (e.Action)
+                {
                     case NotifyCollectionChangedAction.Add:
                         s += $"NumItemsToAdd { e.NewItems.Count}";
                         break;
@@ -124,7 +125,14 @@ namespace TPLPatternsUnitTests {
                     default:
                         break;
                 }
-                receivedEvents[s] = DateTime.Now.ToLongTimeString();
+                return s;
+
+            }
+
+            // These event handler will be attached/detached from the ObservableConcurrentDictionary via that class' constructor and dispose method
+            void onNotifyCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+            {
+                receivedEvents[Message("Outer",e)] = DateTime.Now.ToLongTimeString();
             };
             void onPropertyChanged(object sender, PropertyChangedEventArgs e)
             {
@@ -134,34 +142,19 @@ namespace TPLPatternsUnitTests {
             //These event handlers will be attached to each innerDictionary
             void onNotifyNestedCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
             {
-                string s = $"Ticks: {DateTime.Now.Ticks} Event: NotifyNestedCollectionChanged  Action: {e.Action}  ";
-                switch(e.Action) {
-                    case NotifyCollectionChangedAction.Add:
-                        s += $"NumItemsToAdd { e.NewItems.Count}";
-                        break;
-                    case NotifyCollectionChangedAction.Move:
-                        break;
-                    case NotifyCollectionChangedAction.Remove:
-                        s += $"NumItemsToDel {e.OldItems.Count}";
-                        break;
-                    case NotifyCollectionChangedAction.Replace:
-                        break;
-                    case NotifyCollectionChangedAction.Reset:
-                        break;
-                    default:
-                        break;
-                }
-                receivedEvents[s] = DateTime.Now.ToLongTimeString();
+                receivedEvents[Message("Nested", e)] = DateTime.Now.ToLongTimeString();
             };
             void onNestedPropertyChanged(object sender, PropertyChangedEventArgs e)
             {
                 receivedEvents[$"Ticks: {DateTime.Now.Ticks} Event: NestedPropertyChanged  PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
 
             };
+
+            // Create the Results with the specified event handlers
             WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(onNotifyCollectionChanged,
-                                                                                                                                                                           onPropertyChanged,
-                                                                                                                                                                           onNotifyNestedCollectionChanged,
-                                                                                                                                                                           onNestedPropertyChanged);
+                                                                                                                                                                           onNotifyNestedCollectionChanged
+                                                                                                                                                                           );
+            // A method that parses the input string and record it into the Results dictionary, returning the number of inserts it performed
             int RecordResults(string instr)
             {
                 var match = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);").Match(instr);
@@ -195,7 +188,7 @@ namespace TPLPatternsUnitTests {
                 matchUniqueK1Values = matchUniqueK1Values.NextMatch();
             }
             var numUniqueK1Values = dictUniqueK1Values.Keys.Count;
-            var numOuterNotifyCollectionChanged = receivedEvents.Keys.Where(x => x.Contains("Event: NotifyCollectionChanged"))
+            var numOuterNotifyCollectionChanged = receivedEvents.Keys.Where(x => x.Contains("Event: NotifyOuterCollectionChanged"))
                                                       .ToList()
                                                       .Count;
             Assert.Equal(numUniqueK1Values, numOuterNotifyCollectionChanged);

@@ -84,6 +84,13 @@ namespace TPLPatternExamples {
             calculatedResults.CollectionChanged += onCollectionChanged;
             calculatedResults.PropertyChanged += onPropertyChanged;
         }
+        public WithObservableConcurrentDictionaryAndEventHandlers(NotifyCollectionChangedEventHandler OnCollectionChanged,  NotifyCollectionChangedEventHandler OnNestedCollectionChanged)
+        {
+            calculatedResults = new ConcurrentObservableDictionary<string, ConcurrentObservableDictionary<string, decimal>>();
+            this.onCollectionChanged = OnCollectionChanged;
+            this.onNestedCollectionChanged = OnNestedCollectionChanged;
+            calculatedResults.CollectionChanged += onCollectionChanged;
+        }
 
         public void RecordCalculatedResults(string k1, string k2, decimal pr) {
             if(calculatedResults.ContainsKey(k1)) {
@@ -98,7 +105,8 @@ namespace TPLPatternExamples {
             }
             else {
                 var innerDictionary = new ConcurrentObservableDictionary<string, decimal>();
-                innerDictionary.CollectionChanged += onNestedCollectionChanged;
+                if (this.onNestedCollectionChanged != null) innerDictionary.CollectionChanged += this.onNestedCollectionChanged;
+                if (this.onNestedPropertyChanged != null) innerDictionary.PropertyChanged += this.onNestedPropertyChanged;
                 try { innerDictionary.Add(k2, pr); } catch { new Exception($"adding {pr} to the new innerDictionary keyed by {k2} failed"); }
                 try { calculatedResults.Add(k1, innerDictionary); } catch { new Exception($"adding the new innerDictionary to calculatedResults keyed by {k1} failed"); }
             };
@@ -113,8 +121,8 @@ namespace TPLPatternExamples {
             {
                 while(enumerator.MoveNext()) {
                     var key = enumerator.Current;
-                    calculatedResults[key].CollectionChanged -= onCollectionChanged;
-                    calculatedResults[key].PropertyChanged -= onPropertyChanged;
+                    calculatedResults[key].CollectionChanged -= this.onNestedCollectionChanged;
+                    calculatedResults[key].PropertyChanged -= this.onNestedPropertyChanged;
                 }
             }
             finally
