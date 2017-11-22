@@ -307,19 +307,20 @@ namespace TPLPatternsUnitTests {
         }
         [Theory]
         [InlineData("k1=1,k2=1,1.1;")]
-        //[InlineData("k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
-        //[InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
-        public void CORViaDataFlowBlock(string testInStr)
+        [InlineData("k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
+        [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
+        public void CORViaTrivialDataFlowBlock(string testInStr)
         {
             // Create the Results CODict with the specified event handlers
             WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(_fixture.onNotifyOuterCollectionChanged,
                                                                                                                                                                            _fixture.onNotifyNestedCollectionChanged);
             var REinner = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);");
             // create the individual results via a transform block
+            // this block takes in one small string, and uses a regEx to split it into three fields, and output it as a Tuple
             var calculateResults = new TransformBlock<string, Tuple<string, string, decimal>>(instr =>
             {
-                var match = REinner.Match(instr);
                 var outtup = default(Tuple<string, string, decimal>);
+                var match = REinner.Match(instr);
                 if (match.Success)
                 {
                     outtup= new Tuple<string, string, decimal>(match.Groups["k1"].Value,
@@ -331,7 +332,7 @@ namespace TPLPatternsUnitTests {
                 return outtup;
             });
             // populate the Results via an actionBlock
-            // This is the trivial case
+            // This is a trivial ActionBlock
             var populateResults = new ActionBlock<Tuple<string, string, decimal>>(intup =>
             {
                 withObservableConcurrentDictionaryAndEventHandlers.RecordCalculatedResults(intup.Item1, intup.Item2, intup.Item3);
@@ -347,11 +348,12 @@ namespace TPLPatternsUnitTests {
                 else populateResults.Complete();
             });
 
-            // Send each element of the input array to the head of the pipeline
-            var REouter = new Regex("(?<oneTuple>.*?);");
+            // Split the testInStr string on the ;, and send each substring into the head of the pipeline
+            var REouter = new Regex("(?<oneTuple>.*?;)");
             var matchOuter = REouter.Match(testInStr);
             while (matchOuter.Success)
             {
+                // no error checking
                 calculateResults.Post(matchOuter.Groups["oneTuple"].Value);
                 matchOuter = matchOuter.NextMatch();
             }
@@ -359,7 +361,7 @@ namespace TPLPatternsUnitTests {
             // inform the head that there is no more data
             calculateResults.Complete();
 
-            // wait for the tail oof teh pipeline ot indicate completion
+            // wait for the tail of the pipeline to indicate completion
             populateResults.Completion.Wait();
 
             //Ensure events have a chance to propagate
@@ -375,21 +377,27 @@ namespace TPLPatternsUnitTests {
             var numOuterNotifyCollectionChanged = _fixture.receivedEvents.Keys.Where(x => x.Contains("Event: NotifyOuterCollectionChanged"))
                                                       .ToList()
                                                       .Count;
-            //Count the number of unique values of K1 in the test's input data
-            //Count the number of unique values of K1K2 pairs in the test's input data
+            // find the number of unique values of K1 and the number of k1k2 pairs in the test's input data
             // There should be as many outer NotifyCollectionChanged events are there are unique values of K1 in the input data.
-            var matchUniqueK1Values = new Regex("(?<k1>.*?),.*?;").Match(testInStr);
-            var dictUniqueK1Values = new Dictionary<string, int>();
-            while (matchUniqueK1Values.Success)
+            // There should be as many inner NotifyCollectionChanged events are there are unique values of K1K2 pairs in the input data.
+            var matchUniqueKValues = new Regex("(?<k1>.*?),(?<k2>.*?),.*?;").Match(testInStr);
+            var uniqueK1Values = new HashSet<string>();
+            var uniqueK1K2PairValues = new HashSet<string>();
+            while (matchUniqueKValues.Success)
             {
-                dictUniqueK1Values[matchUniqueK1Values.Groups["k1"].Value] = 0;
-                matchUniqueK1Values = matchUniqueK1Values.NextMatch();
+                // Nice thing about HashSets is, they won't complain if you try to add a duplicate
+                uniqueK1Values.Add(matchUniqueKValues.Groups["k1"].Value);
+                uniqueK1K2PairValues.Add(matchUniqueKValues.Groups["k1"].Value + matchUniqueKValues.Groups["k2"].Value);
+                matchUniqueKValues = matchUniqueKValues.NextMatch();
             }
-            var numUniqueK1Values = dictUniqueK1Values.Keys.Count;
+            // number of unique values of K1 in the test's input data
+            var numUniqueK1Values = uniqueK1Values.Count;
+            // number of unique values of K1K2 pairs in the test's input data
+            var numUniqueK1K2PairValues = uniqueK1K2PairValues.Count;
             // There should be as many outer NotifyCollectionChanged events are there are unique values of K1 in the input data.
             Assert.Equal(numUniqueK1Values, numOuterNotifyCollectionChanged);
             // There should be as many inner NotifyCollectionChanged events are there are unique values of K1K2 pairs in the input data.
-            //Assert.Equal(numUniqueK1K2Values, numInnerNotifyCollectionChanged);
+            Assert.Equal(numUniqueK1K2PairValues, numInnerNotifyCollectionChanged);
         }
     }
 }
