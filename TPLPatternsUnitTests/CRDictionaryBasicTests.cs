@@ -69,7 +69,7 @@ namespace TPLPatternsUnitTests {
         [Theory]
         [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
         public void CORFlattened2And2(string str) {
-            WithObservableConcurrentDictionary withObservableConcurrentDictionary = new WithObservableConcurrentDictionary();
+            WithConcurrentObservableDictionary withObservableConcurrentDictionary = new WithConcurrentObservableDictionary();
             var match = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);").Match(str);
             while(match.Success) {
                 withObservableConcurrentDictionary.RecordCalculatedResults(match.Groups["k1"].Value,
@@ -90,7 +90,7 @@ namespace TPLPatternsUnitTests {
         [Theory]
         [InlineData("k1=1", "k2=2", 1.0)]
         public void CORHasOneCount(string k1, string k2, decimal pr) {
-            WithObservableConcurrentDictionary withObservableConcurrentDictionary = new WithObservableConcurrentDictionary();
+            WithConcurrentObservableDictionary withObservableConcurrentDictionary = new WithConcurrentObservableDictionary();
             withObservableConcurrentDictionary.RecordCalculatedResults(k1,
                                                                        k2,
                                                                        pr);
@@ -197,7 +197,7 @@ namespace TPLPatternsUnitTests {
     }
 
     // Create a disposable TestDataFixture for common and reusable methods
-    public class CORHelpers : IDisposable {
+    public class CORHelpersFirst : IDisposable {
         // create a ConcurrentDictionary to hold the information written by the event handlers
         public ConcurrentDictionary<string, string> receivedEvents = new ConcurrentDictionary<string, string>();
 
@@ -244,7 +244,13 @@ namespace TPLPatternsUnitTests {
             receivedEvents[$"Ticks: {DateTime.Now.Ticks} Event: PropertyChanged  PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
         }
 
-        // parse the input and call the recordResults method repeatedly, returning the number of time iit is called
+        // This event handler will be attached/detached from the ObservableConcurrentDictionary Data1 via that class' constructor and dispose method
+        public void onNotifyData1CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            receivedEvents[Message("Data1", e)] = DateTime.Now.ToLongTimeString();
+        }
+
+        // parse the input and call the recordResults method repeatedly, returning the number of time it is called
         public int RecordResults(string str, Action<string, string, decimal> recordResults) {
             var match = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);").Match(str);
             int _numResultsRecorded = default;
@@ -259,11 +265,12 @@ namespace TPLPatternsUnitTests {
         }
     }
 
-    public class CORFromDataFlowBlockBasicTests : IClassFixture<CORHelpers> {
-        CORHelpers _fixture;
+    // At this point, start using the collection fixture
+    public class CORFromDataFlowBlockBasicTests : IClassFixture<CORHelpersFirst> {
+        CORHelpersFirst _fixture;
         readonly ITestOutputHelper output;
 
-        public CORFromDataFlowBlockBasicTests(ITestOutputHelper output, CORHelpers cORHelpers) {
+        public CORFromDataFlowBlockBasicTests(ITestOutputHelper output, CORHelpersFirst cORHelpers) {
             this.output = output;
             this._fixture = cORHelpers;
         }
@@ -274,6 +281,8 @@ namespace TPLPatternsUnitTests {
         [InlineData("k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
         [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
         public void CORBasic(string str) {
+            // since the receivedEvents list in the fixture is shared between test, the list needs to be cleared
+            _fixture.receivedEvents.Clear();
             // Create the Results with the specified event handlers
             WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(_fixture.onNotifyOuterCollectionChanged,
                                                                                                                                                                            _fixture.onNotifyNestedCollectionChanged);
@@ -304,6 +313,8 @@ namespace TPLPatternsUnitTests {
                                                       .ToList()
                                                       .Count;
             Assert.Equal(numUniqueK1Values, numOuterNotifyCollectionChanged);
+            // since the fixture is shared between test, the fixture needs to be cleared
+            _fixture.receivedEvents.Clear();
         }
         [Theory]
         [InlineData("k1=1,k2=1,1.1;")]
@@ -311,59 +322,62 @@ namespace TPLPatternsUnitTests {
         [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
         public void CORViaTrivialDataFlowBlock(string testInStr)
         {
+            // since the receivedEvents list in the fixture is shared between test, the list needs to be cleared
+            _fixture.receivedEvents.Clear();
             // Create the Results CODict with the specified event handlers
-            WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(_fixture.onNotifyOuterCollectionChanged,
-                                                                                                                                                                           _fixture.onNotifyNestedCollectionChanged);
-            var REinner = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);");
-            // create the individual results via a transform block
-            // this block takes in one small string, and uses a regEx to split it into three fields, and output it as a Tuple
-            var calculateResults = new TransformBlock<string, Tuple<string, string, decimal>>(instr =>
+            using (WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(_fixture.onNotifyOuterCollectionChanged,
+                                                                                                                                                                           _fixture.onNotifyNestedCollectionChanged))
             {
-                var outtup = default(Tuple<string, string, decimal>);
-                var match = REinner.Match(instr);
-                if (match.Success)
+                var REinner = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);");
+                // create the individual results via a transform block
+                // this block takes in one small string, and uses a regEx to split it into three fields, and output it as a Tuple
+                var calculateResults = new TransformBlock<string, Tuple<string, string, decimal>>(instr =>
                 {
-                    outtup= new Tuple<string, string, decimal>(match.Groups["k1"].Value,
-                                  match.Groups["k2"].Value,
-                                  decimal.Parse(match.Groups["pr"].Value));
- ;
+                    var outtup = default(Tuple<string, string, decimal>);
+                    var match = REinner.Match(instr);
+                    if (match.Success)
+                    {
+                        outtup = new Tuple<string, string, decimal>(match.Groups["k1"].Value,
+                                      match.Groups["k2"].Value,
+                                      decimal.Parse(match.Groups["pr"].Value));
+                        ;
+                    }
+
+                    return outtup;
+                });
+                // populate the Results via an actionBlock
+                // This is a trivial ActionBlock
+                var populateResults = new ActionBlock<Tuple<string, string, decimal>>(intup =>
+                {
+                    withObservableConcurrentDictionaryAndEventHandlers.RecordCalculatedResults(intup.Item1, intup.Item2, intup.Item3);
+                });
+
+                //Link calculateResults to populateResults
+                calculateResults.LinkTo(populateResults);
+
+                // Link together the completion/continuation tasks
+                calculateResults.Completion.ContinueWith(t =>
+                {
+                    if (t.IsFaulted) ((IDataflowBlock)populateResults).Fault(t.Exception);
+                    else populateResults.Complete();
+                });
+
+                // Split the testInStr string on the ;, and send each substring into the head of the pipeline
+                var REouter = new Regex("(?<oneTuple>.*?;)");
+                var matchOuter = REouter.Match(testInStr);
+                while (matchOuter.Success)
+                {
+                    // no error checking
+                    calculateResults.Post(matchOuter.Groups["oneTuple"].Value);
+                    matchOuter = matchOuter.NextMatch();
                 }
 
-                return outtup;
-            });
-            // populate the Results via an actionBlock
-            // This is a trivial ActionBlock
-            var populateResults = new ActionBlock<Tuple<string, string, decimal>>(intup =>
-            {
-                withObservableConcurrentDictionaryAndEventHandlers.RecordCalculatedResults(intup.Item1, intup.Item2, intup.Item3);
-            });
+                // inform the head that there is no more data
+                calculateResults.Complete();
 
-            //Link calculateResults to populateResults
-            calculateResults.LinkTo(populateResults);
-
-            // Link together the completion/continuation tasks
-            calculateResults.Completion.ContinueWith(t =>
-            {
-                if (t.IsFaulted) ((IDataflowBlock)populateResults).Fault(t.Exception);
-                else populateResults.Complete();
-            });
-
-            // Split the testInStr string on the ;, and send each substring into the head of the pipeline
-            var REouter = new Regex("(?<oneTuple>.*?;)");
-            var matchOuter = REouter.Match(testInStr);
-            while (matchOuter.Success)
-            {
-                // no error checking
-                calculateResults.Post(matchOuter.Groups["oneTuple"].Value);
-                matchOuter = matchOuter.NextMatch();
-            }
-
-            // inform the head that there is no more data
-            calculateResults.Complete();
-
-            // wait for the tail of the pipeline to indicate completion
-            populateResults.Completion.Wait();
-
+                // wait for the tail of the pipeline to indicate completion
+                populateResults.Completion.Wait();
+            } // the COD will be disposed of at this point
             //Ensure events have a chance to propagate
             Task.Delay(100);
             // send the observed events to test output
@@ -398,6 +412,135 @@ namespace TPLPatternsUnitTests {
             Assert.Equal(numUniqueK1Values, numOuterNotifyCollectionChanged);
             // There should be as many inner NotifyCollectionChanged events are there are unique values of K1K2 pairs in the input data.
             Assert.Equal(numUniqueK1K2PairValues, numInnerNotifyCollectionChanged);
+            // since the fixture is shared between test, the fixture needs to be cleared
+            _fixture.receivedEvents.Clear();
+        }
+    }
+
+    public class ResultsAndData1Basic : IClassFixture<CORHelpersFirst>
+    {
+        CORHelpersFirst _fixture;
+        readonly ITestOutputHelper output;
+
+        public ResultsAndData1Basic(ITestOutputHelper output, CORHelpersFirst cORHelpers)
+        {
+            this.output = output;
+            this._fixture = cORHelpers;
+        }
+
+        [Theory]
+        [InlineData("k1=1,k2=1,c1=1,1.11;")]
+        [InlineData("k1=1,k2=1,c1=1,1.11;k1=1,k2=2,c1=1,1.21;")]
+        [InlineData("k1=2,k2=2,c1=1,2.21;k1=2,k2=1,c1=1,2.11;k1=1,k2=1,c1=1,1.11;k1=1,k2=2,c1=1,1.21;")]
+        public void CORViaRoutedDataFlowBlock(string testInStr)
+        {
+            // since the receivedEvents list in the fixture is shared between test, the list needs to be cleared
+            _fixture.receivedEvents.Clear();
+            // Create the Results CODict with the specified event handlers
+            using (WithCODResultsAndOneCODData withCODResultsAndOneCODData = new WithCODResultsAndOneCODData(_fixture.onNotifyOuterCollectionChanged,
+                    _fixture.onNotifyNestedCollectionChanged, _fixture.onNotifyData1CollectionChanged))
+            {
+                // declare this RegEx outside the transform block so it only will be compiled once
+                var REinner = new Regex("(?<k1>.*?),(?<k2>.*?),(?<c1>.*?),(?<hr>.*?);");
+                // create the individual results via a transform block
+                // the output is k1, k2, c1, bool, and the output is routed on the bool value
+                var Accept1 = new TransformBlock<string, (string k1, string k2, string c1, double hr, bool isReadyToCalculate) >(_input =>
+                {
+                    var match = REinner.Match(_input);
+                    if (match.Success)
+                    {
+                        var outtup = (
+                            match.Groups["k1"].Value,
+                                      match.Groups["k2"].Value, match.Groups["c1"].Value,
+                                      double.Parse(match.Groups["hr"].Value), true);
+                        return outtup;
+                    }
+                    throw new ArgumentException($"{_input} does not match the needed input pattern");
+                });
+
+                // this block takes in a tuple that is isReadyToCalculate, and calculates pr
+                var calculateResults = new TransformBlock<(string k1, string k2, string c1, double hr, bool isReadyToCalculate),(string k1, string k2, decimal pr) > (_input =>
+                {
+
+                    return (_input.k1,_input.k2,Decimal.Parse(_input.hr.ToString()));
+                });
+                // populate the Results via an actionBlock
+                // This is a trivial ActionBlock
+                var populateResults = new ActionBlock<(string k1, string k2, decimal pr)>(_input =>
+                {
+                    // here we start using a shorter name, RecordResults, for the method
+                    withCODResultsAndOneCODData.RecordResults(_input.k1, _input.k2, _input.pr);
+                });
+
+                // Link Accept1 to 
+                Accept1.LinkTo(calculateResults, mc => mc.isReadyToCalculate);
+                //Link calculateResults to populateResults
+                calculateResults.LinkTo(populateResults);
+
+                // Link together the completion/continuation tasks
+                Accept1.Completion.ContinueWith(t =>
+                {
+                    if (t.IsFaulted) ((IDataflowBlock)calculateResults).Fault(t.Exception);
+                    else calculateResults.Complete();
+                });
+                calculateResults.Completion.ContinueWith(t =>
+                {
+                    if (t.IsFaulted) ((IDataflowBlock)populateResults).Fault(t.Exception);
+                    else populateResults.Complete();
+                });
+
+                // Split the testInStr string on the ;, and send each substring into the head of the pipeline
+                var REouter = new Regex("(?<oneTuple>.*?;)");
+                var matchOuter = REouter.Match(testInStr);
+                while (matchOuter.Success)
+                {
+                    // no error checking
+                    Accept1.Post(matchOuter.Groups["oneTuple"].Value);
+                    matchOuter = matchOuter.NextMatch();
+                }
+
+                // inform the head that there is no more data
+                Accept1.Complete();
+
+                // wait for the tail of the pipeline to indicate completion
+                populateResults.Completion.Wait();
+            } // the COD will be disposed of at this point
+            //Ensure events have a chance to propagate
+            Task.Delay(100);
+            // send the observed events to test output
+            _fixture.receivedEvents.Keys.OrderBy(x => x)
+                .ToList()
+                .ForEach(x => output.WriteLine($"{x} : {_fixture.receivedEvents[x]}"));
+            // Count the number of inner and outer CollectionChanged events that occurred
+            var numInnerNotifyCollectionChanged = _fixture.receivedEvents.Keys.Where(x => x.Contains("Event: NotifyNestedCollectionChanged"))
+                                                      .ToList()
+                                                      .Count;
+            var numOuterNotifyCollectionChanged = _fixture.receivedEvents.Keys.Where(x => x.Contains("Event: NotifyOuterCollectionChanged"))
+                                                      .ToList()
+                                                      .Count;
+            // find the number of unique values of K1 and the number of k1k2 pairs in the test's input data
+            // There should be as many outer NotifyCollectionChanged events are there are unique values of K1 in the input data.
+            // There should be as many inner NotifyCollectionChanged events are there are unique values of K1K2 pairs in the input data.
+            var matchUniqueKValues = new Regex("(?<k1>.*?),(?<k2>.*?),.*?;").Match(testInStr);
+            var uniqueK1Values = new HashSet<string>();
+            var uniqueK1K2PairValues = new HashSet<string>();
+            while (matchUniqueKValues.Success)
+            {
+                // Nice thing about HashSets is, they won't complain if you try to add a duplicate
+                uniqueK1Values.Add(matchUniqueKValues.Groups["k1"].Value);
+                uniqueK1K2PairValues.Add(matchUniqueKValues.Groups["k1"].Value + matchUniqueKValues.Groups["k2"].Value);
+                matchUniqueKValues = matchUniqueKValues.NextMatch();
+            }
+            // number of unique values of K1 in the test's input data
+            var numUniqueK1Values = uniqueK1Values.Count;
+            // number of unique values of K1K2 pairs in the test's input data
+            var numUniqueK1K2PairValues = uniqueK1K2PairValues.Count;
+            // There should be as many outer NotifyCollectionChanged events are there are unique values of K1 in the input data.
+            Assert.Equal(numUniqueK1Values, numOuterNotifyCollectionChanged);
+            // There should be as many inner NotifyCollectionChanged events are there are unique values of K1K2 pairs in the input data.
+            Assert.Equal(numUniqueK1K2PairValues, numInnerNotifyCollectionChanged);
+            // since the fixture is shared between test, the fixture needs to be cleared
+            _fixture.receivedEvents.Clear();
         }
     }
 }
