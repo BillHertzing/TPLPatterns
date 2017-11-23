@@ -12,11 +12,14 @@ using Xunit;
 using Xunit.Abstractions;
 
 
-namespace TPLPatternsUnitTests {
-    public class ConcurrentDictionaryForResultsBasicTests {
+namespace TPLPatternsUnitTests
+{
+    public class ConcurrentDictionaryForResultsBasicTests
+    {
         [Theory]
         [InlineData("k1=1", "k2=2", 1.1)]
-        public void CRFlattened1And1(string k1, string k2, decimal pr) {
+        public void CRFlattened1And1(string k1, string k2, decimal pr)
+        {
             TPLPatterns tplPatterns = new TPLPatterns();
             tplPatterns.RecordCalculatedResults(k1, k2, pr);
             string fs = string.Empty;
@@ -29,11 +32,13 @@ namespace TPLPatternsUnitTests {
         // Some of the InlineData is not sorted, but the query over the dictionaries will sort, so the asserts are for the results in sorted order
         [Theory]
         [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
-        public void CRFlattened2And2(string str) {
+        public void CRFlattened2And2(string str)
+        {
             TPLPatterns tplPatterns = new TPLPatterns();
             Regex RE = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);");
             var match = RE.Match(str);
-            while(match.Success) {
+            while (match.Success)
+            {
                 tplPatterns.RecordCalculatedResults(match.Groups["k1"].Value,
                                                     match.Groups["k2"].Value,
                                                     decimal.Parse(match.Groups["pr"].Value));
@@ -51,27 +56,32 @@ namespace TPLPatternsUnitTests {
 
         [Theory]
         [InlineData("k1=1", "k2=2", 1.0)]
-        public void ValidateCRHasOneCount(string k1, string k2, decimal pr) {
+        public void ValidateCRHasOneCount(string k1, string k2, decimal pr)
+        {
             TPLPatterns tplPatterns = new TPLPatterns();
             tplPatterns.RecordCalculatedResults(k1, k2, pr);
             Assert.Equal(1, tplPatterns.calculatedResults.Count);
         }
     }
 
-    public class ObservableConcurrentDictionaryForResultsBasicTests {
+    public class ObservableConcurrentDictionaryForResultsBasicTests
+    {
         readonly ITestOutputHelper output;
 
-        public ObservableConcurrentDictionaryForResultsBasicTests(ITestOutputHelper output) {
+        public ObservableConcurrentDictionaryForResultsBasicTests(ITestOutputHelper output)
+        {
             this.output = output;
         }
 
         // Some of the InlineData is not sorted, but the query over the dictionaries will sort, so the asserts are for the results in sorted order
         [Theory]
         [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
-        public void CORFlattened2And2(string str) {
+        public void CORFlattened2And2(string str)
+        {
             WithConcurrentObservableDictionary withObservableConcurrentDictionary = new WithConcurrentObservableDictionary();
             var match = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);").Match(str);
-            while(match.Success) {
+            while (match.Success)
+            {
                 withObservableConcurrentDictionary.RecordCalculatedResults(match.Groups["k1"].Value,
                                                                            match.Groups["k2"].Value,
                                                                            decimal.Parse(match.Groups["pr"].Value));
@@ -89,7 +99,8 @@ namespace TPLPatternsUnitTests {
 
         [Theory]
         [InlineData("k1=1", "k2=2", 1.0)]
-        public void CORHasOneCount(string k1, string k2, decimal pr) {
+        public void CORHasOneCount(string k1, string k2, decimal pr)
+        {
             WithConcurrentObservableDictionary withObservableConcurrentDictionary = new WithConcurrentObservableDictionary();
             withObservableConcurrentDictionary.RecordCalculatedResults(k1,
                                                                        k2,
@@ -103,7 +114,8 @@ namespace TPLPatternsUnitTests {
         [InlineData("k1=1,k2=1,1.1;")]
         [InlineData("k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
         [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
-        public void CORPropertyChangedEventsViaObserver(string str) {
+        public void CORPropertyChangedEventsViaObserver(string str)
+        {
             // Going to use a ConcurrentDictionary to hold the information written by the event handlers
             ConcurrentDictionary<string, string> receivedEvents = new ConcurrentDictionary<string, string>();
 
@@ -111,7 +123,8 @@ namespace TPLPatternsUnitTests {
             string Message(string depth, NotifyCollectionChangedEventArgs e)
             {
                 string s = $"Ticks: {DateTime.Now.Ticks} Event: Notify{depth}CollectionChanged  Action: {e.Action}  ";
-                switch(e.Action) {
+                switch (e.Action)
+                {
                     case NotifyCollectionChangedAction.Add:
                         s += $"NumItemsToAdd { e.NewItems.Count}";
                         break;
@@ -160,7 +173,8 @@ namespace TPLPatternsUnitTests {
             {
                 var match = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);").Match(instr);
                 int _numResultsRecorded = default;
-                while(match.Success) {
+                while (match.Success)
+                {
                     withObservableConcurrentDictionaryAndEventHandlers.RecordCalculatedResults(match.Groups["k1"].Value,
                                                                                                match.Groups["k2"].Value,
                                                                                                decimal.Parse(match.Groups["pr"].Value));
@@ -184,7 +198,8 @@ namespace TPLPatternsUnitTests {
             // There should be as many outer NotifyCollectionChanged events are there are unique values of K1 in the input str.
             var matchUniqueK1Values = new Regex("(?<k1>.*?),.*?;").Match(str);
             var dictUniqueK1Values = new Dictionary<string, int>();
-            while(matchUniqueK1Values.Success) {
+            while (matchUniqueK1Values.Success)
+            {
                 dictUniqueK1Values[matchUniqueK1Values.Groups["k1"].Value] = 0;
                 matchUniqueK1Values = matchUniqueK1Values.NextMatch();
             }
@@ -197,14 +212,17 @@ namespace TPLPatternsUnitTests {
     }
 
     // Create a disposable TestDataFixture for common and reusable methods
-    public class CORHelpersFirst : IDisposable {
+    public class CORHelpersFirst : IDisposable
+    {
         // create a ConcurrentDictionary to hold the information written by the event handlers
-        public ConcurrentDictionary<string, string> receivedEvents = new ConcurrentDictionary<string, string>();
+        public ConcurrentDictionary<string, string> receivedResultsEvents = new ConcurrentDictionary<string, string>();
 
         // The messages to be written to the receivedEvent dictionary
-        string Message(string depth, NotifyCollectionChangedEventArgs e) {
+        public string Message(string depth, NotifyCollectionChangedEventArgs e)
+        {
             string s = $"Ticks: {DateTime.Now.Ticks} Event: Notify{depth}CollectionChanged  Action: {e.Action}  ";
-            switch(e.Action) {
+            switch (e.Action)
+            {
                 case NotifyCollectionChangedAction.Add:
                     s += $"NumItemsToAdd { e.NewItems.Count}";
                     break;
@@ -223,38 +241,39 @@ namespace TPLPatternsUnitTests {
             return s;
         }
 
-        public void Dispose() {
-        }
-
-        public void onNestedPropertyChanged(object sender, PropertyChangedEventArgs e) {
-            receivedEvents[$"Ticks: {DateTime.Now.Ticks} Event: NestedPropertyChanged  PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
+        public void Dispose()
+        {
         }
 
         //These event handlers will be attached to each innerDictionary
-        public void onNotifyNestedCollectionChanged(object sender, NotifyCollectionChangedEventArgs e) {
-            receivedEvents[Message("Nested", e)] = DateTime.Now.ToLongTimeString();
+        public void onNotifyNestedCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            receivedResultsEvents[Message("Nested", e)] = DateTime.Now.ToLongTimeString();
+        }
+
+        public void onNestedPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            receivedResultsEvents[$"Ticks: {DateTime.Now.Ticks} Event: NestedPropertyChanged  PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
         }
 
         // These event handler will be attached/detached from the ObservableConcurrentDictionary via that class' constructor and dispose method
-        public void onNotifyOuterCollectionChanged(object sender, NotifyCollectionChangedEventArgs e) {
-            receivedEvents[Message("Outer", e)] = DateTime.Now.ToLongTimeString();
-        }
-
-        public void onPropertyChanged(object sender, PropertyChangedEventArgs e) {
-            receivedEvents[$"Ticks: {DateTime.Now.Ticks} Event: PropertyChanged  PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
-        }
-
-        // This event handler will be attached/detached from the ObservableConcurrentDictionary Data1 via that class' constructor and dispose method
-        public void onNotifyData1CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        public void onNotifyOuterCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            receivedEvents[Message("Data1", e)] = DateTime.Now.ToLongTimeString();
+            receivedResultsEvents[Message("Outer", e)] = DateTime.Now.ToLongTimeString();
+        }
+
+        public void onPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            receivedResultsEvents[$"Ticks: {DateTime.Now.Ticks} Event: PropertyChanged  PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
         }
 
         // parse the input and call the recordResults method repeatedly, returning the number of time it is called
-        public int RecordResults(string str, Action<string, string, decimal> recordResults) {
+        public int RecordResults(string str, Action<string, string, decimal> recordResults)
+        {
             var match = new Regex("(?<k1>.*?),(?<k2>.*?),(?<pr>.*?);").Match(str);
             int _numResultsRecorded = default;
-            while(match.Success) {
+            while (match.Success)
+            {
                 recordResults(match.Groups["k1"].Value,
                               match.Groups["k2"].Value,
                               decimal.Parse(match.Groups["pr"].Value));
@@ -266,11 +285,13 @@ namespace TPLPatternsUnitTests {
     }
 
     // At this point, start using the collection fixture
-    public class CORFromDataFlowBlockBasicTests : IClassFixture<CORHelpersFirst> {
+    public class CORFromDataFlowBlockBasicTests : IClassFixture<CORHelpersFirst>
+    {
         CORHelpersFirst _fixture;
         readonly ITestOutputHelper output;
 
-        public CORFromDataFlowBlockBasicTests(ITestOutputHelper output, CORHelpersFirst cORHelpers) {
+        public CORFromDataFlowBlockBasicTests(ITestOutputHelper output, CORHelpersFirst cORHelpers)
+        {
             this.output = output;
             this._fixture = cORHelpers;
         }
@@ -280,9 +301,10 @@ namespace TPLPatternsUnitTests {
         [InlineData("k1=1,k2=1,1.1;")]
         [InlineData("k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
         [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
-        public void CORBasic(string str) {
-            // since the receivedEvents list in the fixture is shared between test, the list needs to be cleared
-            _fixture.receivedEvents.Clear();
+        public void CORBasic(string str)
+        {
+            // since the receivedResultsEvents list in the fixture is shared between test, the list needs to be cleared
+            _fixture.receivedResultsEvents.Clear();
             // Create the Results with the specified event handlers
             WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(_fixture.onNotifyOuterCollectionChanged,
                                                                                                                                                                            _fixture.onNotifyNestedCollectionChanged);
@@ -293,28 +315,29 @@ namespace TPLPatternsUnitTests {
             //Ensure events have a chance to propagate
             Task.Delay(100);
             // send the observed events to test output
-            _fixture.receivedEvents.Keys.OrderBy(x => x)
+            _fixture.receivedResultsEvents.Keys.OrderBy(x => x)
                 .ToList()
-                .ForEach(x => output.WriteLine($"{x} : {_fixture.receivedEvents[x]}"));
+                .ForEach(x => output.WriteLine($"{x} : {_fixture.receivedResultsEvents[x]}"));
             // There should be as many inner NotifyCollectionChanged events are there are results recorded.
-            var numInnerNotifyCollectionChanged = _fixture.receivedEvents.Keys.Where(x => x.Contains("Event: NotifyNestedCollectionChanged"))
+            var numInnerNotifyCollectionChanged = _fixture.receivedResultsEvents.Keys.Where(x => x.Contains("Event: NotifyNestedCollectionChanged"))
                                                       .ToList()
                                                       .Count;
             Assert.Equal(numResultsRecorded, numInnerNotifyCollectionChanged);
             // There should be as many outer NotifyCollectionChanged events are there are unique values of K1 in the input str.
             var matchUniqueK1Values = new Regex("(?<k1>.*?),.*?;").Match(str);
             var dictUniqueK1Values = new Dictionary<string, int>();
-            while(matchUniqueK1Values.Success) {
+            while (matchUniqueK1Values.Success)
+            {
                 dictUniqueK1Values[matchUniqueK1Values.Groups["k1"].Value] = 0;
                 matchUniqueK1Values = matchUniqueK1Values.NextMatch();
             }
             var numUniqueK1Values = dictUniqueK1Values.Keys.Count;
-            var numOuterNotifyCollectionChanged = _fixture.receivedEvents.Keys.Where(x => x.Contains("Event: NotifyOuterCollectionChanged"))
+            var numOuterNotifyCollectionChanged = _fixture.receivedResultsEvents.Keys.Where(x => x.Contains("Event: NotifyOuterCollectionChanged"))
                                                       .ToList()
                                                       .Count;
             Assert.Equal(numUniqueK1Values, numOuterNotifyCollectionChanged);
             // since the fixture is shared between test, the fixture needs to be cleared
-            _fixture.receivedEvents.Clear();
+            _fixture.receivedResultsEvents.Clear();
         }
         [Theory]
         [InlineData("k1=1,k2=1,1.1;")]
@@ -322,8 +345,8 @@ namespace TPLPatternsUnitTests {
         [InlineData("k1=2,k2=2,2.2;k1=2,k2=1,2.1;k1=1,k2=1,1.1;k1=1,k2=2,1.2;")]
         public void CORViaTrivialDataFlowBlock(string testInStr)
         {
-            // since the receivedEvents list in the fixture is shared between test, the list needs to be cleared
-            _fixture.receivedEvents.Clear();
+            // since the receivedResultsEvents list in the fixture is shared between test, the list needs to be cleared
+            _fixture.receivedResultsEvents.Clear();
             // Create the Results CODict with the specified event handlers
             using (WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(_fixture.onNotifyOuterCollectionChanged,
                                                                                                                                                                            _fixture.onNotifyNestedCollectionChanged))
@@ -381,14 +404,14 @@ namespace TPLPatternsUnitTests {
             //Ensure events have a chance to propagate
             Task.Delay(100);
             // send the observed events to test output
-            _fixture.receivedEvents.Keys.OrderBy(x => x)
+            _fixture.receivedResultsEvents.Keys.OrderBy(x => x)
                 .ToList()
-                .ForEach(x => output.WriteLine($"{x} : {_fixture.receivedEvents[x]}"));
+                .ForEach(x => output.WriteLine($"{x} : {_fixture.receivedResultsEvents[x]}"));
             // Count the number of inner and outer CollectionChanged events that occurred
-            var numInnerNotifyCollectionChanged = _fixture.receivedEvents.Keys.Where(x => x.Contains("Event: NotifyNestedCollectionChanged"))
+            var numInnerNotifyCollectionChanged = _fixture.receivedResultsEvents.Keys.Where(x => x.Contains("Event: NotifyNestedCollectionChanged"))
                                                       .ToList()
                                                       .Count;
-            var numOuterNotifyCollectionChanged = _fixture.receivedEvents.Keys.Where(x => x.Contains("Event: NotifyOuterCollectionChanged"))
+            var numOuterNotifyCollectionChanged = _fixture.receivedResultsEvents.Keys.Where(x => x.Contains("Event: NotifyOuterCollectionChanged"))
                                                       .ToList()
                                                       .Count;
             // find the number of unique values of K1 and the number of k1k2 pairs in the test's input data
@@ -413,7 +436,7 @@ namespace TPLPatternsUnitTests {
             // There should be as many inner NotifyCollectionChanged events are there are unique values of K1K2 pairs in the input data.
             Assert.Equal(numUniqueK1K2PairValues, numInnerNotifyCollectionChanged);
             // since the fixture is shared between test, the fixture needs to be cleared
-            _fixture.receivedEvents.Clear();
+            _fixture.receivedResultsEvents.Clear();
         }
     }
 
@@ -434,42 +457,41 @@ namespace TPLPatternsUnitTests {
         [InlineData("k1=2,k2=2,c1=1,2.21;k1=2,k2=1,c1=1,2.11;k1=1,k2=1,c1=1,1.11;k1=1,k2=2,c1=1,1.21;")]
         public void CORViaRoutedDataFlowBlock(string testInStr)
         {
-            // since the receivedEvents list in the fixture is shared between test, the list needs to be cleared
-            _fixture.receivedEvents.Clear();
+            // since the receivedResultsEvents list in the fixture is shared between test, the list needs to be cleared
+            _fixture.receivedResultsEvents.Clear();
             // Create the Results CODict with the specified event handlers
-            using (WithCODResultsAndOneCODData withCODResultsAndOneCODData = new WithCODResultsAndOneCODData(_fixture.onNotifyOuterCollectionChanged,
-                    _fixture.onNotifyNestedCollectionChanged, _fixture.onNotifyData1CollectionChanged))
+            using (WithObservableConcurrentDictionaryAndEventHandlers withObservableConcurrentDictionaryAndEventHandlers = new WithObservableConcurrentDictionaryAndEventHandlers(_fixture.onNotifyOuterCollectionChanged,
+                    _fixture.onNotifyNestedCollectionChanged))
             {
                 // declare this RegEx outside the transform block so it only will be compiled once
                 var REinner = new Regex("(?<k1>.*?),(?<k2>.*?),(?<c1>.*?),(?<hr>.*?);");
                 // create the individual results via a transform block
                 // the output is k1, k2, c1, bool, and the output is routed on the bool value
-                var Accept1 = new TransformBlock<string, (string k1, string k2, string c1, double hr, bool isReadyToCalculate) >(_input =>
-                {
-                    var match = REinner.Match(_input);
-                    if (match.Success)
-                    {
-                        var outtup = (
-                            match.Groups["k1"].Value,
-                                      match.Groups["k2"].Value, match.Groups["c1"].Value,
-                                      double.Parse(match.Groups["hr"].Value), true);
-                        return outtup;
-                    }
-                    throw new ArgumentException($"{_input} does not match the needed input pattern");
-                });
+                var Accept1 = new TransformBlock<string, (string k1, string k2, string c1, double hr, bool isReadyToCalculate)>(_input =>
+               {
+                   var match = REinner.Match(_input);
+                   if (match.Success)
+                   {
+                       var outtup = (
+                           match.Groups["k1"].Value,
+                                     match.Groups["k2"].Value, match.Groups["c1"].Value,
+                                     double.Parse(match.Groups["hr"].Value), true);
+                       return outtup;
+                   }
+                   throw new ArgumentException($"{_input} does not match the needed input pattern");
+               });
 
                 // this block takes in a tuple that is isReadyToCalculate, and calculates pr
-                var calculateResults = new TransformBlock<(string k1, string k2, string c1, double hr, bool isReadyToCalculate),(string k1, string k2, decimal pr) > (_input =>
-                {
+                var calculateResults = new TransformBlock<(string k1, string k2, string c1, double hr, bool isReadyToCalculate), (string k1, string k2, decimal pr)>(_input =>
+               {
 
-                    return (_input.k1,_input.k2,Decimal.Parse(_input.hr.ToString()));
-                });
+                   return (_input.k1, _input.k2, Decimal.Parse(_input.hr.ToString()));
+               });
                 // populate the Results via an actionBlock
                 // This is a trivial ActionBlock
                 var populateResults = new ActionBlock<(string k1, string k2, decimal pr)>(_input =>
                 {
-                    // here we start using a shorter name, RecordResults, for the method
-                    withCODResultsAndOneCODData.RecordResults(_input.k1, _input.k2, _input.pr);
+                    withObservableConcurrentDictionaryAndEventHandlers.RecordCalculatedResults(_input.k1, _input.k2, _input.pr);
                 });
 
                 // Link Accept1 to 
@@ -508,14 +530,14 @@ namespace TPLPatternsUnitTests {
             //Ensure events have a chance to propagate
             Task.Delay(100);
             // send the observed events to test output
-            _fixture.receivedEvents.Keys.OrderBy(x => x)
+            _fixture.receivedResultsEvents.Keys.OrderBy(x => x)
                 .ToList()
-                .ForEach(x => output.WriteLine($"{x} : {_fixture.receivedEvents[x]}"));
+                .ForEach(x => output.WriteLine($"{x} : {_fixture.receivedResultsEvents[x]}"));
             // Count the number of inner and outer CollectionChanged events that occurred
-            var numInnerNotifyCollectionChanged = _fixture.receivedEvents.Keys.Where(x => x.Contains("Event: NotifyNestedCollectionChanged"))
+            var numInnerNotifyCollectionChanged = _fixture.receivedResultsEvents.Keys.Where(x => x.Contains("Event: NotifyNestedCollectionChanged"))
                                                       .ToList()
                                                       .Count;
-            var numOuterNotifyCollectionChanged = _fixture.receivedEvents.Keys.Where(x => x.Contains("Event: NotifyOuterCollectionChanged"))
+            var numOuterNotifyCollectionChanged = _fixture.receivedResultsEvents.Keys.Where(x => x.Contains("Event: NotifyOuterCollectionChanged"))
                                                       .ToList()
                                                       .Count;
             // find the number of unique values of K1 and the number of k1k2 pairs in the test's input data
@@ -540,7 +562,30 @@ namespace TPLPatternsUnitTests {
             // There should be as many inner NotifyCollectionChanged events are there are unique values of K1K2 pairs in the input data.
             Assert.Equal(numUniqueK1K2PairValues, numInnerNotifyCollectionChanged);
             // since the fixture is shared between test, the fixture needs to be cleared
-            _fixture.receivedEvents.Clear();
+            _fixture.receivedResultsEvents.Clear();
         }
     }
+
+    // Extend the collection fixture to support Data1
+    public class CORHelpersData1 : CORHelpersFirst, IDisposable
+    {
+
+        // create a ConcurrentDictionary to hold the information written by the event handlers
+        public ConcurrentDictionary<string, string> receivedData1Events = new ConcurrentDictionary<string, string>();
+
+        // These event handler will be attached/detached from the Data1Dictionary via that class' constructor and dispose method
+        public void onNotifyData1CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            receivedData1Events[Message("Data1", e)] = DateTime.Now.ToLongTimeString();
+        }
+
+        public void onData1PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            receivedData1Events[$"Ticks: {DateTime.Now.Ticks} Event: PropertyChanged  PropertyName {e.PropertyName}"] = DateTime.Now.ToLongTimeString();
+        }
+        //ToDo ensure that the dispose for the Data1 dictionary is called so that the event handlers are deregistered
+
+    }
+    // here we start using a shorter name, RecordResults, for the method
+
 }
